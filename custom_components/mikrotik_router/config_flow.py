@@ -177,9 +177,9 @@ class MikrotikControllerConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Optional(
                         CONF_VERIFY_SSL, default=user_input[CONF_VERIFY_SSL]
                     ): bool,
-                       vol.Optional("poe_only_mode", default=user_input.get("poe_only_mode", False)): bool,
-                       vol.Optional(CONF_POE_INTERFACES, default=user_input.get(CONF_POE_INTERFACES, self.poe_interfaces)): vol.MultiSelect(self.poe_interfaces or []),
-                       vol.Optional(CONF_POE_GROUPS, default=user_input.get(CONF_POE_GROUPS, "")): str,
+                    vol.Optional("poe_only_mode", default=user_input.get("poe_only_mode", False)): bool,
+                    vol.Optional(CONF_POE_INTERFACES, default=user_input.get(CONF_POE_INTERFACES, [])): vol.MultiSelect(self.poe_interfaces or []),
+                    vol.Optional(CONF_POE_GROUPS, default=user_input.get(CONF_POE_GROUPS, "")): str,
                 }
             ),
             errors=errors,

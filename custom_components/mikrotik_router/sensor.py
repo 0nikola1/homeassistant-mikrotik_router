@@ -25,7 +25,7 @@ from .sensor_types import (
     DEVICE_ATTRIBUTES_IFACE_SFP,
     DEVICE_ATTRIBUTES_IFACE_WIRELESS,
 )
-from .const import CONF_POE_GROUPS
+from .const import CONF_POE_GROUPS, CONF_POE_INTERFACES
 
 _LOGGER = getLogger(__name__)
 
@@ -46,11 +46,25 @@ async def async_setup_entry(
     }
     await async_add_entities(hass, config_entry, dispatcher)
 
-    # Add POE sensors if POE-only mode is enabled
-    if config_entry.options.get("poe_only_mode", False):
+    # Add POE sensors if POE interfaces are selected or POE-only mode is enabled
+    poe_interfaces = config_entry.options.get(CONF_POE_INTERFACES, [])
+    poe_only_mode = config_entry.options.get("poe_only_mode", False)
+    
+    if poe_interfaces or poe_only_mode:
         coordinator = hass.data["mikrotik_router"][config_entry.entry_id].data_coordinator
-        poe_interfaces = coordinator.ds.get("poe", {}).keys()
-        entities = [MikrotikPOESensor(coordinator, iface) for iface in poe_interfaces]
+        entities = []
+        
+        # Get available POE interfaces from coordinator data
+        available_poe_interfaces = list(coordinator.ds.get("poe", {}).keys())
+        
+        if poe_only_mode and not poe_interfaces:
+            # In POE-only mode with no specific selection, use all available
+            selected_interfaces = available_poe_interfaces
+        else:
+            # Use selected interfaces, filtered by what's available
+            selected_interfaces = [iface for iface in poe_interfaces if iface in available_poe_interfaces]
+        
+        entities.extend([MikrotikPOESensor(coordinator, iface) for iface in selected_interfaces])
         
         # Add POE group sensors
         poe_groups_str = config_entry.options.get(CONF_POE_GROUPS, "")
@@ -63,6 +77,24 @@ async def async_setup_entry(
                     entities.append(MikrotikPOEGroupSensor(coordinator, group_name, interfaces))
         
         _async_add_entities(entities)
+
+
+# ---------------------------
+#   MikrotikPOESensor
+# ---------------------------
+class MikrotikPOESensor(CoordinatorEntity, SensorEntity):
+    """Sensor for POE wattage of an interface."""
+    def __init__(self, coordinator, interface):
+        super().__init__(coordinator)
+        self._attr_name = f"POE Power {interface}"
+        self._attr_unique_id = f"{coordinator.host}_poe_power_{interface}"
+        self._attr_native_unit_of_measurement = "W"
+        self.interface = interface
+
+    @property
+    def native_value(self):
+        poe_data = self.coordinator.ds.get("poe", {})
+        return poe_data.get(self.interface, None)
 
 
 # ---------------------------

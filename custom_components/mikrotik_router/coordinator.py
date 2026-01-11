@@ -681,11 +681,14 @@ class MikrotikCoordinator(DataUpdateCoordinator[None]):
             raise UpdateFailed("Mikrotik Disconnected")
 
         # async_dispatcher_send(self.hass, "update_sensors", self)
-        if self.config_entry.options.get("poe_only_mode", False):
+        poe_interfaces = self.config_entry.options.get(CONF_POE_INTERFACES, [])
+        poe_only_mode = self.config_entry.options.get("poe_only_mode", False)
+        
+        if poe_interfaces or poe_only_mode:
             poe_ds = {}
-            selected_interfaces = self.config_entry.options.get(CONF_POE_INTERFACES, [])
-            if not selected_interfaces:
-                # If none selected, use all with POE
+            selected_interfaces = poe_interfaces if poe_interfaces else []
+            if not selected_interfaces and poe_only_mode:
+                # If none selected and in POE-only mode, use all with POE
                 for iface, vals in self.ds.get("interface", {}).items():
                     if vals.get("type") == "ether" and vals.get("poe-out", "off") not in ["off", "N/A", None, "disabled"]:
                         selected_interfaces.append(iface)
