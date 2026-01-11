@@ -151,7 +151,7 @@ class MikrotikControllerConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_NAME: DEFAULT_DEVICE_NAME,
                 CONF_HOST: DEFAULT_HOST,
                 CONF_USERNAME: DEFAULT_USERNAME,
-                CONF_PASSWORD: DEFAULT_USERNAME,
+                CONF_PASSWORD: "",
                 CONF_PORT: DEFAULT_PORT,
                 CONF_SSL: DEFAULT_SSL,
                 CONF_VERIFY_SSL: DEFAULT_VERIFY_SSL,
@@ -177,12 +177,9 @@ class MikrotikControllerConfigFlow(ConfigFlow, domain=DOMAIN):
             vol.Optional("poe_only_mode", default=user_input.get("poe_only_mode", False)): bool,
         }
         
-        # Only add POE options if we have available interfaces
-        if self.poe_interfaces:
-            schema_dict.update({
-                vol.Optional(CONF_POE_INTERFACES, default=user_input.get(CONF_POE_INTERFACES, [])): vol.MultiSelect(self.poe_interfaces),
-                vol.Optional(CONF_POE_GROUPS, default=user_input.get(CONF_POE_GROUPS, "")): str,
-            })
+        # Always add POE options
+        schema_dict[vol.Optional(CONF_POE_INTERFACES, default=user_input.get(CONF_POE_INTERFACES, []))] = [str] if not self.poe_interfaces else vol.MultiSelect(self.poe_interfaces)
+        schema_dict[vol.Optional(CONF_POE_GROUPS, default=user_input.get(CONF_POE_GROUPS, ""))] = str
         
         return self.async_show_form(
             step_id="user",
