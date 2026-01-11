@@ -478,3 +478,26 @@ class MikrotikAPI:
         time_diff = self._current_milliseconds() - self.client_traffic_last_run
         self.client_traffic_last_run = self._current_milliseconds()
         return time_diff / 1000
+
+    # ---------------------------
+    #   get_poe_power
+    # ---------------------------
+    def get_poe_power(self, interface_name):
+        """Get POE power (W) for a given ethernet interface."""
+        if not self.connection_check():
+            return None
+        path = "/interface/ethernet/poe/monitor"
+        args = {"numbers": interface_name, "once": True}
+        self.lock.acquire()
+        try:
+            response = self._connection.path(path)
+            result = list(response(**args))
+        except Exception as e:
+            self.disconnect("poe_monitor", e)
+            self.lock.release()
+            return None
+        self.lock.release()
+        if result and isinstance(result, list):
+            poe_info = result[0]
+            return poe_info.get("poe-out-power")
+        return None

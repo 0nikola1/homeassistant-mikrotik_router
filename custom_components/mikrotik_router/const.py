@@ -61,6 +61,10 @@ DEFAULT_SENSOR_ENVIRONMENT = False
 CONF_SENSOR_NETWATCH_TRACKER = "sensor_netwatch_tracker"
 DEFAULT_SENSOR_NETWATCH_TRACKER = False
 
+CONF_POE_INTERFACES = "poe_interfaces"
+
+CONF_POE_GROUPS = "poe_groups"
+
 TO_REDACT = {
     "ip-address",
     "client-ip-address",

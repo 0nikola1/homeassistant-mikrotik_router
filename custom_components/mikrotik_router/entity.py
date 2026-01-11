@@ -37,6 +37,10 @@ _LOGGER = getLogger(__name__)
 
 
 def _skip_sensor(config_entry, entity_description, data, uid) -> bool:
+    # Skip all sensors in POE-only mode
+    if config_entry.options.get("poe_only_mode", False):
+        return True
+
     # Sensors
     if (
         entity_description.func == "MikrotikInterfaceTrafficSensor"

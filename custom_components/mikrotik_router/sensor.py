@@ -13,6 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import MikrotikCoordinator
 from .entity import MikrotikEntity, async_add_entities
@@ -24,6 +25,7 @@ from .sensor_types import (
     DEVICE_ATTRIBUTES_IFACE_SFP,
     DEVICE_ATTRIBUTES_IFACE_WIRELESS,
 )
+from .const import CONF_POE_GROUPS
 
 _LOGGER = getLogger(__name__)
 
@@ -43,6 +45,48 @@ async def async_setup_entry(
         "MikrotikClientTrafficSensor": MikrotikClientTrafficSensor,
     }
     await async_add_entities(hass, config_entry, dispatcher)
+
+    # Add POE sensors if POE-only mode is enabled
+    if config_entry.options.get("poe_only_mode", False):
+        coordinator = hass.data["mikrotik_router"][config_entry.entry_id].data_coordinator
+        poe_interfaces = coordinator.ds.get("poe", {}).keys()
+        entities = [MikrotikPOESensor(coordinator, iface) for iface in poe_interfaces]
+        
+        # Add POE group sensors
+        poe_groups_str = config_entry.options.get(CONF_POE_GROUPS, "")
+        if poe_groups_str:
+            for group_def in poe_groups_str.split(";"):
+                if ":" in group_def:
+                    group_name, ifaces_str = group_def.split(":", 1)
+                    group_name = group_name.strip()
+                    interfaces = [iface.strip() for iface in ifaces_str.split(",")]
+                    entities.append(MikrotikPOEGroupSensor(coordinator, group_name, interfaces))
+        
+        _async_add_entities(entities)
+
+
+# ---------------------------
+#   MikrotikPOEGroupSensor
+# ---------------------------
+class MikrotikPOEGroupSensor(CoordinatorEntity, SensorEntity):
+    """Sensor for summed POE wattage of multiple interfaces."""
+    def __init__(self, coordinator, group_name, interfaces):
+        super().__init__(coordinator)
+        self._attr_name = f"POE Power {group_name}"
+        self._attr_unique_id = f"{coordinator.host}_poe_power_{group_name.lower().replace(' ', '_')}"
+        self._attr_native_unit_of_measurement = "W"
+        self.group_name = group_name
+        self.interfaces = interfaces
+
+    @property
+    def native_value(self):
+        poe_data = self.coordinator.ds.get("poe", {})
+        total = 0
+        for iface in self.interfaces:
+            power = poe_data.get(iface, 0)
+            if power:
+                total += power
+        return total if total > 0 else None
 
 
 # ---------------------------

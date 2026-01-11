@@ -63,6 +63,7 @@ from .const import (
     DEFAULT_SENSOR_ENVIRONMENT,
     CONF_SENSOR_NETWATCH_TRACKER,
     DEFAULT_SENSOR_NETWATCH_TRACKER,
+    CONF_POE_INTERFACES,
 )
 from .apiparser import parse_api
 from .mikrotikapi import MikrotikAPI
@@ -680,6 +681,18 @@ class MikrotikCoordinator(DataUpdateCoordinator[None]):
             raise UpdateFailed("Mikrotik Disconnected")
 
         # async_dispatcher_send(self.hass, "update_sensors", self)
+        if self.config_entry.options.get("poe_only_mode", False):
+            poe_ds = {}
+            selected_interfaces = self.config_entry.options.get(CONF_POE_INTERFACES, [])
+            if not selected_interfaces:
+                # If none selected, use all with POE
+                for iface, vals in self.ds.get("interface", {}).items():
+                    if vals.get("type") == "ether" and vals.get("poe-out", "off") not in ["off", "N/A", None, "disabled"]:
+                        selected_interfaces.append(iface)
+            for iface in selected_interfaces:
+                poe_power = await self.hass.async_add_executor_job(self.api.get_poe_power, iface)
+                poe_ds[iface] = poe_power
+            self.ds["poe"] = poe_ds
         return self.ds
 
     # ---------------------------

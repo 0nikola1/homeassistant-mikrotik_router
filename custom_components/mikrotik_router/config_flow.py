@@ -63,6 +63,8 @@ from .const import (
     DEFAULT_VERIFY_SSL,
     DEFAULT_SENSOR_NETWATCH_TRACKER,
     CONF_SENSOR_NETWATCH_TRACKER,
+    CONF_POE_INTERFACES,
+    CONF_POE_GROUPS,
 )
 from .mikrotikapi import MikrotikAPI
 
@@ -91,6 +93,7 @@ class MikrotikControllerConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self):
         """Initialize MikrotikControllerConfigFlow."""
+        self.poe_interfaces = []
 
     @staticmethod
     @callback
@@ -122,10 +125,23 @@ class MikrotikControllerConfigFlow(ConfigFlow, domain=DOMAIN):
             if not api.connect():
                 errors[CONF_HOST] = api.error
 
+            # Fetch POE interfaces if connected
+            if api.connected():
+                try:
+                    interfaces = api.query("/interface/ethernet")
+                    self.poe_interfaces = [
+                        iface["name"] for iface in interfaces
+                        if iface.get("poe-out") not in ["off", "N/A", None, "disabled"]
+                    ]
+                except Exception:
+                    self.poe_interfaces = []
+
             # Save instance
             if not errors:
+                data = user_input.copy()
+                data["poe_interfaces_available"] = self.poe_interfaces
                 return self.async_create_entry(
-                    title=user_input[CONF_NAME], data=user_input
+                    title=user_input[CONF_NAME], data=data
                 )
 
             return self._show_config_form(user_input=user_input, errors=errors)
@@ -161,6 +177,9 @@ class MikrotikControllerConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Optional(
                         CONF_VERIFY_SSL, default=user_input[CONF_VERIFY_SSL]
                     ): bool,
+                       vol.Optional("poe_only_mode", default=user_input.get("poe_only_mode", False)): bool,
+                       vol.Optional(CONF_POE_INTERFACES, default=user_input.get(CONF_POE_INTERFACES, self.poe_interfaces)): vol.MultiSelect(self.poe_interfaces or []),
+                       vol.Optional(CONF_POE_GROUPS, default=user_input.get(CONF_POE_GROUPS, "")): str,
                 }
             ),
             errors=errors,
@@ -215,6 +234,9 @@ class MikrotikControllerOptionsFlowHandler(OptionsFlow):
                         CONF_ZONE,
                         default=self.config_entry.options.get(CONF_ZONE, STATE_HOME),
                     ): str,
+                       vol.Optional("poe_only_mode", default=self.options.get("poe_only_mode", False)): bool,
+                       vol.Optional(CONF_POE_INTERFACES, default=self.options.get(CONF_POE_INTERFACES, self.config_entry.data.get("poe_interfaces_available", []))): vol.MultiSelect(self.config_entry.data.get("poe_interfaces_available", [])),
+                       vol.Optional(CONF_POE_GROUPS, default=self.options.get(CONF_POE_GROUPS, "")): str,
                 }
             ),
         )
