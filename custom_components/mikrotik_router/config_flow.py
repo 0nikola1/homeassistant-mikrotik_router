@@ -164,24 +164,29 @@ class MikrotikControllerConfigFlow(ConfigFlow, domain=DOMAIN):
     # ---------------------------
     def _show_config_form(self, user_input, errors=None):
         """Show the configuration form to edit data."""
+        schema_dict = {
+            vol.Required(CONF_NAME, default=user_input[CONF_NAME]): str,
+            vol.Required(CONF_HOST, default=user_input[CONF_HOST]): str,
+            vol.Required(CONF_USERNAME, default=user_input[CONF_USERNAME]): str,
+            vol.Required(CONF_PASSWORD, default=user_input[CONF_PASSWORD]): str,
+            vol.Optional(CONF_PORT, default=user_input[CONF_PORT]): int,
+            vol.Optional(CONF_SSL, default=user_input[CONF_SSL]): bool,
+            vol.Optional(
+                CONF_VERIFY_SSL, default=user_input[CONF_VERIFY_SSL]
+            ): bool,
+            vol.Optional("poe_only_mode", default=user_input.get("poe_only_mode", False)): bool,
+        }
+        
+        # Only add POE options if we have available interfaces
+        if self.poe_interfaces:
+            schema_dict.update({
+                vol.Optional(CONF_POE_INTERFACES, default=user_input.get(CONF_POE_INTERFACES, [])): vol.MultiSelect(self.poe_interfaces),
+                vol.Optional(CONF_POE_GROUPS, default=user_input.get(CONF_POE_GROUPS, "")): str,
+            })
+        
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_NAME, default=user_input[CONF_NAME]): str,
-                    vol.Required(CONF_HOST, default=user_input[CONF_HOST]): str,
-                    vol.Required(CONF_USERNAME, default=user_input[CONF_USERNAME]): str,
-                    vol.Required(CONF_PASSWORD, default=user_input[CONF_PASSWORD]): str,
-                    vol.Optional(CONF_PORT, default=user_input[CONF_PORT]): int,
-                    vol.Optional(CONF_SSL, default=user_input[CONF_SSL]): bool,
-                    vol.Optional(
-                        CONF_VERIFY_SSL, default=user_input[CONF_VERIFY_SSL]
-                    ): bool,
-                    vol.Optional("poe_only_mode", default=user_input.get("poe_only_mode", False)): bool,
-                    vol.Optional(CONF_POE_INTERFACES, default=user_input.get(CONF_POE_INTERFACES, [])): vol.MultiSelect(self.poe_interfaces or []),
-                    vol.Optional(CONF_POE_GROUPS, default=user_input.get(CONF_POE_GROUPS, "")): str,
-                }
-            ),
+            data_schema=vol.Schema(schema_dict),
             errors=errors,
         )
 
